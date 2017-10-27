@@ -11,7 +11,7 @@ function(protobuf_generate)
   include(CMakeParseArguments)
 
   set(_options APPEND_PATH)
-  set(_singleargs LANGUAGE OUT_VAR)
+  set(_singleargs LANGUAGE OUT_VAR EXPORT_MACRO)
   if(COMMAND target_sources)
     list(APPEND _singleargs TARGET)
   endif()
@@ -34,6 +34,10 @@ function(protobuf_generate)
   endif()
   string(TOLOWER ${protobuf_generate_LANGUAGE} protobuf_generate_LANGUAGE)
 
+  if(protobuf_generate_EXPORT_MACRO AND protobuf_generate_LANGUAGE STREQUAL cpp)
+    set(_dll_export_decl "dllexport_decl=${protobuf_generate_EXPORT_MACRO}:")
+  endif()
+
   if(NOT protobuf_GENERATE_EXTENSIONS)
     if(protobuf_generate_LANGUAGE STREQUAL cpp)
       set(protobuf_GENERATE_EXTENSIONS .pb.h .pb.cc)
@@ -45,9 +49,23 @@ function(protobuf_generate)
     endif()
   endif()
 
+  if(protobuf_generate_TARGET)
+    get_target_property(_source_list ${protobuf_generate_TARGET} SOURCES)
+    foreach(_file ${_source_list})
+      if(_file MATCHES "proto$")
+        list(APPEND protobuf_generate_PROTOS ${_file})
+      endif()
+    endforeach()
+  endif()
+
+  if(NOT protobuf_generate_PROTOS)
+    message(SEND_ERROR "Error: protobuf_generate could not find any .proto files")
+    return()
+  endif()
+
   if(protobuf_generate_APPEND_PATH)
     # Create an include path for each file specified
-    foreach(_file ${ARGN})
+    foreach(_file ${protobuf_generate_PROTOS})
       get_filename_component(_abs_file ${_file} ABSOLUTE)
       get_filename_component(_abs_path ${_abs_file} PATH)
       list(FIND _protobuf_include_path ${_abs_path} _contains_already)
@@ -67,20 +85,6 @@ function(protobuf_generate)
     endif()
   endforeach()
 
-  if(protobuf_generate_TARGET)
-    get_target_property(_source_list ${protobuf_generate_TARGET} SOURCES)
-    foreach(_file ${_source_list})
-      if(_file MATCHES "proto$")
-        list(APPEND protobuf_generate_PROTOS ${_file})
-      endif()
-    endforeach()
-  endif()
-
-  if(NOT protobuf_generate_PROTOS)
-    message(SEND_ERROR "Error: protobuf_generate could not find any .proto files")
-    return()
-  endif()
-
   set(_generated_srcs_all)
   foreach(_proto ${protobuf_generate_PROTOS})
     get_filename_component(_abs_file ${_proto} ABSOLUTE)
@@ -95,7 +99,7 @@ function(protobuf_generate)
     add_custom_command(
       OUTPUT ${_generated_srcs}
       COMMAND  protobuf::protoc
-      ARGS --${protobuf_generate_LANGUAGE}_out  ${CMAKE_CURRENT_BINARY_DIR} ${_protobuf_include_path} ${_abs_file}
+      ARGS --${protobuf_generate_LANGUAGE}_out ${_dll_export_decl}${CMAKE_CURRENT_BINARY_DIR} ${_protobuf_include_path} ${_abs_file}
       DEPENDS ${ABS_FIL} protobuf::protoc
       COMMENT "Running ${protobuf_generate_LANGUAGE} protocol buffer compiler on ${_proto}"
       VERBATIM )
