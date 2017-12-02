@@ -184,7 +184,6 @@ struct ParseTable {
 static_assert(sizeof(ParseTableField) <= 16, "ParseTableField is too large");
 // The tables must be composed of POD components to ensure link-time
 // initialization.
-static_assert(std::is_pod<ParseTableField>::value, "");
 static_assert(std::is_pod<AuxillaryParseTableField::enum_aux>::value, "");
 static_assert(std::is_pod<AuxillaryParseTableField::message_aux>::value, "");
 static_assert(std::is_pod<AuxillaryParseTableField::string_aux>::value, "");
